@@ -9,17 +9,17 @@ import LoginModal from "./components/LoginModal";
 import PaymentModal from "./components/PaymentModal";
 import NotificationManager from "./components/NotificationManager";
 
-// Import data
-import {
-  DUMMY_POTHOLE_DATA,
-  DUMMY_UHI_DATA,
-  simulateAPICall,
-} from "./data/dummyData";
+// Import data and API
+import { DUMMY_POTHOLE_DATA, DUMMY_UHI_DATA } from "./data/dummyData";
+import API from "./services/api";
 
 // Import styles
 import "./index.css";
 
 const App = () => {
+  // Initialize API client
+  const apiClient = API;
+
   // User state
   const [user, setUser] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -54,14 +54,19 @@ const App = () => {
   // Authentication handlers
   const handleLogin = async (userData) => {
     try {
-      // Simulate API call
-      const response = await simulateAPICall("login", userData, 500);
+      // Test API connectivity first
+      const healthCheck = await apiClient.testConnection();
+      if (!healthCheck.connected) {
+        throw new Error("Backend not available");
+      }
+
       setUser({
         ...userData,
         paymentStatus: userData.paymentStatus || "unpaid",
       });
       addNotification("Successfully logged in!", "success");
     } catch (error) {
+      console.error("Login error:", error);
       addNotification("Login failed. Please try again.", "error");
     }
   };
@@ -80,13 +85,15 @@ const App = () => {
 
   const handlePayment = async () => {
     try {
-      const response = await simulateAPICall("payment", { amount: 5000 }, 2000);
+      // For now, simulate payment processing
+      // In real implementation, this would integrate with payment provider
       setUser((prev) => ({ ...prev, paymentStatus: "paid" }));
       addNotification(
         "Payment successful! Premium features unlocked.",
         "success"
       );
     } catch (error) {
+      console.error("Payment error:", error);
       addNotification("Payment failed. Please try again.", "error");
     }
   };
@@ -153,51 +160,78 @@ const App = () => {
     addNotification("Processing your request...", "info");
 
     try {
-      // Prepare request data
-      const requestData =
-        requestType === "region"
-          ? {
-              center: { lat: regionCenter.lat, lon: regionCenter.lng },
-              radius_km: radius,
-              dataType: selectedAPI,
-            }
-          : {
-              start_coords: { lat: pathPoints[0].lat, lon: pathPoints[0].lng },
-              end_coords: { lat: pathPoints[1].lat, lon: pathPoints[1].lng },
-              buffer_meters: bufferWidth,
-              dataType: selectedAPI,
-            };
+      // Prepare request data and call appropriate API endpoint
+      let response;
 
-      // Simulate API call
-      const response = await simulateAPICall(
-        `data/${requestType}`,
-        {
-          ...requestData,
-          paymentStatus: user.paymentStatus,
-        },
-        2000
-      );
-
-      // Process response and update map
-      if (selectedAPI === "potholes") {
-        setMapData({ type: "geojson", data: DUMMY_POTHOLE_DATA });
-        addNotification(
-          `Found ${DUMMY_POTHOLE_DATA.features.length} potholes in the selected area`,
-          "success"
+      if (requestType === "region") {
+        response = await apiClient.fetchRegionData(
+          { lat: regionCenter.lat, lng: regionCenter.lng },
+          radius,
+          selectedAPI
         );
       } else {
-        setMapData({ type: "uhi", data: DUMMY_UHI_DATA });
-        addNotification(
-          `Heat island data loaded for ${DUMMY_UHI_DATA.length} locations`,
-          "success"
+        response = await apiClient.fetchPathData(
+          { lat: pathPoints[0].lat, lng: pathPoints[0].lng },
+          { lat: pathPoints[1].lat, lng: pathPoints[1].lng },
+          bufferWidth,
+          selectedAPI
         );
       }
+
+      // Process response and update map
+      if (response && response.data) {
+        if (selectedAPI === "potholes") {
+          setMapData({ type: "geojson", data: response.data });
+          const featureCount = response.data.features
+            ? response.data.features.length
+            : 0;
+          addNotification(
+            `Found ${featureCount} potholes in the selected area`,
+            "success"
+          );
+        } else {
+          setMapData({ type: "uhi", data: response.data });
+          const dataCount = Array.isArray(response.data)
+            ? response.data.length
+            : 0;
+          addNotification(
+            `Heat island data loaded for ${dataCount} locations`,
+            "success"
+          );
+        }
+      } else {
+        // Fallback to dummy data if no response
+        if (selectedAPI === "potholes") {
+          setMapData({ type: "geojson", data: DUMMY_POTHOLE_DATA });
+          addNotification(
+            `Using sample data: ${DUMMY_POTHOLE_DATA.features.length} potholes`,
+            "warning"
+          );
+        } else {
+          setMapData({ type: "uhi", data: DUMMY_UHI_DATA });
+          addNotification(
+            `Using sample data: ${DUMMY_UHI_DATA.length} locations`,
+            "warning"
+          );
+        }
+      }
     } catch (error) {
-      if (error.status === 402) {
+      console.error("API Error:", error);
+
+      if (
+        error.message?.includes("402") ||
+        error.message?.includes("payment")
+      ) {
         addNotification("Payment required for data access", "error");
         setShowPaymentModal(true);
       } else {
-        addNotification("Failed to fetch data. Please try again.", "error");
+        // Fallback to dummy data on error
+        addNotification("API unavailable, using sample data", "warning");
+        if (selectedAPI === "potholes") {
+          setMapData({ type: "geojson", data: DUMMY_POTHOLE_DATA });
+        } else {
+          setMapData({ type: "uhi", data: DUMMY_UHI_DATA });
+        }
       }
     } finally {
       setLoading(false);
