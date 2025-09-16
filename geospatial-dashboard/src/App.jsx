@@ -1,25 +1,19 @@
 // src/App.jsx
-import React, { useState } from "react";
-
-// Import components
-import Navbar from "./components/Navbar";
-import Sidebar from "./components/Sidebar";
-import MapComponent from "./components/MapComponent";
-import LoginModal from "./components/LoginModal";
-import PaymentModal from "./components/PaymentModal";
-import NotificationManager from "./components/NotificationManager";
-
-// Import data and API
-import { DUMMY_POTHOLE_DATA, DUMMY_UHI_DATA } from "./data/dummyData";
-import API from "./services/api";
-
-// Import styles
-import "./index.css";
+import { useState, useEffect } from 'react';
+import MapComponent from './components/MapComponent';
+import Sidebar from './components/Sidebar';
+import Navbar from './components/Navbar';
+import LoginModal from './components/LoginModal';
+import PaymentModal from './components/PaymentModal';
+import RouteComponent from './components/RouteComponent';
+import NotificationManager from './components/NotificationManager';
+import CostDisplay from './components/CostDisplay';
+import CostAnalytics from './components/CostAnalytics';
+import { apiClient, costTracker } from './services/api';
+import { DUMMY_POTHOLE_DATA, DUMMY_UHI_DATA } from './data/dummyData';
+import './index.css';
 
 const App = () => {
-  // Initialize API client
-  const apiClient = API;
-
   // User state
   const [user, setUser] = useState(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -27,6 +21,10 @@ const App = () => {
 
   // Notification state
   const [notifications, setNotifications] = useState([]);
+  
+  // Cost tracking state
+  const [showCostAnalytics, setShowCostAnalytics] = useState(false);
+  const [currentCost, setCurrentCost] = useState(0);
 
   // Control panel state
   const [selectedAPI, setSelectedAPI] = useState("uhi");
@@ -39,6 +37,23 @@ const App = () => {
   const [mapData, setMapData] = useState(null);
   const [regionCenter, setRegionCenter] = useState(null);
   const [pathPoints, setPathPoints] = useState([]);
+
+  // Initialize cost tracker
+  useEffect(() => {
+    const initCostTracker = async () => {
+      if (user?.id) {
+        try {
+          await costTracker.initialize(user.id, user.subscription_tier || 'FREE');
+          const usage = await costTracker.getCurrentUsage();
+          setCurrentCost(usage.cost_today);
+        } catch (error) {
+          console.error('Failed to initialize cost tracker:', error);
+        }
+      }
+    };
+
+    initCostTracker();
+  }, [user]);
 
   // Notification helpers
   const addNotification = (message, type = "info") => {
@@ -162,14 +177,43 @@ const App = () => {
     try {
       // Prepare request data and call appropriate API endpoint
       let response;
+      let estimatedCost = 0;
 
+      // Calculate cost before making the request
       if (requestType === "region") {
+        estimatedCost = await costTracker.estimateRegionCost(
+          { lat: regionCenter.lat, lng: regionCenter.lng },
+          radius,
+          selectedAPI
+        );
+        
+        // Check if user can afford this request
+        if (!(await costTracker.canMakeRequest(estimatedCost))) {
+          addNotification("Request would exceed your usage limits", "error");
+          setShowPaymentModal(true);
+          return;
+        }
+
         response = await apiClient.fetchRegionData(
           { lat: regionCenter.lat, lng: regionCenter.lng },
           radius,
           selectedAPI
         );
       } else {
+        estimatedCost = await costTracker.estimatePathCost(
+          { lat: pathPoints[0].lat, lng: pathPoints[0].lng },
+          { lat: pathPoints[1].lat, lng: pathPoints[1].lng },
+          bufferWidth,
+          selectedAPI
+        );
+        
+        // Check if user can afford this request
+        if (!(await costTracker.canMakeRequest(estimatedCost))) {
+          addNotification("Request would exceed your usage limits", "error");
+          setShowPaymentModal(true);
+          return;
+        }
+
         response = await apiClient.fetchPathData(
           { lat: pathPoints[0].lat, lng: pathPoints[0].lng },
           { lat: pathPoints[1].lat, lng: pathPoints[1].lng },
@@ -177,6 +221,15 @@ const App = () => {
           selectedAPI
         );
       }
+
+      // Record the request cost
+      await costTracker.recordRequest(selectedAPI, requestType, estimatedCost);
+      
+      // Update current cost display
+      const usage = await costTracker.getCurrentUsage();
+      setCurrentCost(usage.cost_today);
+      
+      addNotification(`Request cost: $${estimatedCost.toFixed(4)}`, "info");
 
       // Process response and update map
       if (response && response.data) {
@@ -285,15 +338,44 @@ const App = () => {
           loading={loading}
         />
 
-        <MapComponent
-          requestType={requestType}
-          onRegionClick={handleRegionClick}
-          onPathClick={handlePathClick}
-          regionCenter={regionCenter}
-          pathPoints={pathPoints}
-          radius={radius}
-          mapData={mapData}
-        />
+        <div className="flex-1 flex flex-col">
+          <MapComponent
+            requestType={requestType}
+            onRegionClick={handleRegionClick}
+            onPathClick={handlePathClick}
+            regionCenter={regionCenter}
+            pathPoints={pathPoints}
+            radius={radius}
+            mapData={mapData}
+          />
+          
+          {/* Cost Display */}
+          {user && (
+            <div className="border-t p-4 bg-background">
+              <div className="flex items-center justify-between mb-2">
+                <CostDisplay
+                  currentCost={currentCost}
+                  tier={user.subscription_tier || 'FREE'}
+                  costTracker={costTracker}
+                />
+                <button
+                  onClick={() => setShowCostAnalytics(!showCostAnalytics)}
+                  className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  {showCostAnalytics ? 'Hide Analytics' : 'Show Analytics'}
+                </button>
+              </div>
+              
+              {showCostAnalytics && (
+                <CostAnalytics
+                  userId={user.id}
+                  tier={user.subscription_tier || 'FREE'}
+                  costTracker={costTracker}
+                />
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Notifications */}
