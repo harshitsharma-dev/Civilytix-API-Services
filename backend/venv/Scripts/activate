@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="E:\Civilytix\Projects\Civilytix-API-Services\backend\venv"
+VIRTUAL_ENV="E:\Civilytix\Projects\Civilytix-API-Services-2\Civilytix-API-Services\backend\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
