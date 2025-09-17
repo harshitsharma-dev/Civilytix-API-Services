@@ -1,6 +1,25 @@
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
+from enum import Enum
+
+
+class CostTier(str, Enum):
+    """User tier for cost calculations"""
+    FREE = "free"
+    BASIC = "basic"
+    PREMIUM = "premium"
+    ENTERPRISE = "enterprise"
+
+
+class CostCalculation(BaseModel):
+    """Cost calculation details"""
+    base_cost: float
+    data_volume_cost: float
+    processing_cost: float
+    total_cost: float
+    credits_used: float
+    tier: CostTier
 
 
 class RegionRequest(BaseModel):
@@ -90,3 +109,39 @@ class DownloadResponse(BaseModel):
     """Response model for download URL."""
     requestId: str
     downloadUrl: str
+
+
+class UsageInstanceResponse(BaseModel):
+    """Response model for usage instance"""
+    request_id: str
+    timestamp: datetime
+    endpoint: str
+    method: str
+    user_id: Optional[str]
+    user_tier: CostTier
+    request_params: Dict[str, Any]
+    response_status: int
+    processing_time_ms: float
+    data_volume_mb: float
+    cost_calculation: CostCalculation
+    ip_address: Optional[str]
+
+
+class UsageMetricsResponse(BaseModel):
+    """Response model for usage metrics"""
+    total_requests: int
+    total_cost: float
+    average_response_time: float
+    error_rate: float
+    requests_by_tier: Dict[str, int]
+    cost_by_tier: Dict[str, float]
+
+
+class EndpointUsageResponse(BaseModel):
+    """Response model for endpoint usage statistics"""
+    endpoint: str
+    request_count: int
+    total_cost: float
+    average_response_time: float
+    error_count: int
+    last_accessed: Optional[datetime]
