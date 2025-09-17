@@ -164,9 +164,10 @@ class UsageTracker:
         # Default request cost calculation
         return self.cost_tracker.calculate_request_cost(
             user_tier=user_tier,
-            operation_type="default",
-            data_size_mb=data_volume_mb,
-            region_type="local"
+            data_type="default",
+            estimated_size_mb=data_volume_mb,
+            region_type="local",
+            priority="normal"
         )
     
     def _update_internal_stats(self, instance: APIUsageInstance):
