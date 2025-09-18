@@ -34,7 +34,7 @@ backend/
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11 (required; see requirements.txt for version pinning)
 - MongoDB Atlas account (or local MongoDB)
 - Google Cloud Storage bucket (optional, for file storage)
 
@@ -63,6 +63,11 @@ backend/
    ```bash
    pip install -r requirements.txt
    ```
+
+   > **Note:**
+   >
+   > - The `requirements.txt` file pins Python to version 3.11 for compatibility and reproducibility.
+   > - NumPy is pinned to `<2.0.0` due to compatibility issues with some geospatial libraries (e.g., Shapely). If you encounter errors related to NumPy or C extensions, ensure you are using Python 3.11 and NumPy <2.0.0.
 
 4. **Configure environment variables:**
    Create a `.env` file in the backend directory:
