@@ -215,7 +215,7 @@ const App = () => {
 
       if (requestType === "region") {
         response = await apiClient.fetchRegionData(
-          { lat: regionCenter.lat, lng: regionCenter.lng },
+          { lat: regionCenter.lat, lon: regionCenter.lng }, // use 'lon'
           radius,
           selectedAPI
         );
