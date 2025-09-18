@@ -1,9 +1,10 @@
 // src/components/MapComponent.jsx
-import React from "react";
+import React, { useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
   useMapEvents,
+  useMap,
   Marker,
   Popup,
   Circle,
@@ -128,6 +129,19 @@ const Legend = ({ mapData }) => {
   return null;
 };
 
+// Map Center Controller Component
+const MapCenterController = ({ center }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (center) {
+      map.setView([center.lat, center.lng], 13);
+    }
+  }, [center, map]);
+
+  return null;
+};
+
 // Main Map Component
 const MapComponent = ({
   requestType,
@@ -137,6 +151,7 @@ const MapComponent = ({
   pathPoints,
   radius,
   mapData,
+  centerLocation, // New prop to center map on specific location
 }) => {
   // Style function for GeoJSON features
   const getGeoJSONStyle = (feature) => {
@@ -177,8 +192,8 @@ const MapComponent = ({
   return (
     <div className="flex-1 relative">
       <MapContainer
-        center={[12.9141, 79.1325]}
-        zoom={13}
+        center={[20.5937, 78.9629]} // Center of India
+        zoom={5} // Zoom level to show most of India
         className="h-full w-full"
         zoomControl={true}
         attributionControl={true}
@@ -187,6 +202,9 @@ const MapComponent = ({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+
+        {/* Map center controller - centers map when location is selected */}
+        <MapCenterController center={centerLocation} />
 
         <MapClickHandler
           requestType={requestType}

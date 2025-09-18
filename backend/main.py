@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import uvicorn
+import os
 
 from app.core.config import settings
 from app.services.database import db_service
@@ -23,11 +26,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Failed to connect to database: {e}")
     
-    # Load geospatial data
+    # Test MongoDB connection
     try:
-        geo_service.load_potholes_data()
+        if geo_service.mongo_client is not None:
+            print("MongoDB connection established successfully")
+        else:
+            print("MongoDB connection failed, using mock data")
     except Exception as e:
-        print(f"Failed to load potholes data: {e}")
+        print(f"Error checking MongoDB connection: {e}")
     
     # Initialize cloud storage
     try:
@@ -71,6 +77,11 @@ app.add_middleware(
 # Include routers
 app.include_router(data_router, prefix=settings.API_V1_STR)
 app.include_router(user_router, prefix=settings.API_V1_STR)
+
+# Mount static files for local storage (development only)
+local_storage_path = os.path.join(os.getcwd(), "local_storage")
+if os.path.exists(local_storage_path):
+    app.mount("/local_storage", StaticFiles(directory=local_storage_path), name="local_storage")
 
 
 @app.get("/")

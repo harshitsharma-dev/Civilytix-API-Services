@@ -6,23 +6,54 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const LoginModal = ({ isOpen, onClose, onLogin }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = () => {
-    // Simulate login
-    onLogin({
-      name: username || "John Doe",
-      paymentStatus: "unpaid",
-      token: "dummy_jwt_token",
-    });
-    onClose();
-    setUsername("");
-    setPassword("");
+  const handleSubmit = async () => {
+    if (!email) {
+      setError("Please enter an email address");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      // Call the backend login API
+      const response = await fetch("http://localhost:8000/api/v1/user/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Login failed");
+      }
+
+      const userData = await response.json();
+
+      // Pass user data to parent component
+      onLogin(userData);
+      onClose();
+      setEmail("");
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("Login failed. Please check your email or try demo accounts.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = (demoEmail) => {
+    setEmail(demoEmail);
+    setTimeout(handleSubmit, 100); // Small delay to let state update
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !loading) {
       handleSubmit();
     }
   };
@@ -37,34 +68,60 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email Address</Label>
               <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Enter username (or leave empty for demo)"
+                placeholder="Enter your email address"
+                disabled={loading}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter password"
-              />
+
+            <Button
+              onClick={handleSubmit}
+              className="w-full"
+              disabled={loading}
+            >
+              {loading ? "Logging in..." : "Login"}
+            </Button>
+
+            <div className="border-t pt-4">
+              <p className="text-sm text-gray-600 mb-3">Demo Accounts:</p>
+              <div className="space-y-2">
+                <Button
+                  onClick={() => handleDemoLogin("free2@example.com")}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-left justify-start"
+                  disabled={loading}
+                >
+                  🆓 Free User (free2@example.com)
+                </Button>
+                <Button
+                  onClick={() => handleDemoLogin("premium1@example.com")}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-left justify-start"
+                  disabled={loading}
+                >
+                  ⭐ Premium User (premium1@example.com)
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleSubmit}>Login</Button>
-            </div>
+
+            <Button onClick={onClose} variant="outline" className="w-full">
+              Cancel
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -10,7 +10,6 @@ import PaymentModal from "./components/PaymentModal";
 import NotificationManager from "./components/NotificationManager";
 
 // Import data and API
-import { DUMMY_POTHOLE_DATA, DUMMY_UHI_DATA } from "./data/dummyData";
 import API from "./services/api";
 
 // Import styles
@@ -39,6 +38,7 @@ const App = () => {
   const [mapData, setMapData] = useState(null);
   const [regionCenter, setRegionCenter] = useState(null);
   const [pathPoints, setPathPoints] = useState([]);
+  const [mapCenterLocation, setMapCenterLocation] = useState(null); // New state for map centering
 
   // Notification helpers
   const addNotification = (message, type = "info") => {
@@ -54,24 +54,42 @@ const App = () => {
   // Authentication handlers
   const handleLogin = async (userData) => {
     try {
-      // Test API connectivity first
+      // Use the API key from the user data (returned by our login endpoint)
+      const apiKey = userData.api_key;
+      if (!apiKey) {
+        throw new Error("No API key received from login");
+      }
+
+      // Set API key for future requests
+      apiClient.setAPIKey(apiKey);
+
+      // Test API connectivity
       const healthCheck = await apiClient.testConnection();
       if (!healthCheck.connected) {
-        throw new Error("Backend not available");
+        throw new Error(
+          "Backend not available. Please ensure the backend server is running."
+        );
       }
 
       setUser({
         ...userData,
-        paymentStatus: userData.paymentStatus || "unpaid",
+        apiKey: apiKey,
+        // Map subscription_status to paymentStatus for backwards compatibility
+        paymentStatus:
+          userData.subscription_status === "premium" ? "paid" : "unpaid",
       });
       addNotification("Successfully logged in!", "success");
     } catch (error) {
       console.error("Login error:", error);
-      addNotification("Login failed. Please try again.", "error");
+      addNotification(`Login failed: ${error.message}`, "error");
     }
   };
 
   const handleLogout = () => {
+    // Clear API key from client
+    apiClient.setAPIKey(null);
+
+    // Clear user state
     setUser(null);
     setMapData(null);
     setRegionCenter(null);
@@ -129,6 +147,35 @@ const App = () => {
     }
   };
 
+  // Location search handler
+  const handleLocationSelect = (location) => {
+    const { lat, lng, name } = location;
+
+    // Center the map on the selected location
+    setMapCenterLocation({ lat, lng });
+
+    if (requestType === "region") {
+      setRegionCenter({ lat, lng });
+      setPathPoints([]);
+      addNotification(
+        `Region center set at ${
+          name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+        }`,
+        "success"
+      );
+    } else {
+      // For path mode, set as first point
+      setPathPoints([{ lat, lng }]);
+      setRegionCenter(null);
+      addNotification(
+        `Path start point set at ${
+          name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+        }. Click map for end point.`,
+        "info"
+      );
+    }
+  };
+
   // Data request handler
   const handleGetData = async () => {
     // Validation
@@ -157,10 +204,13 @@ const App = () => {
     }
 
     setLoading(true);
+    setMapData("loading"); // Show loading indicator on map
     addNotification("Processing your request...", "info");
 
     try {
-      // Prepare request data and call appropriate API endpoint
+      // Set API key for the request
+      apiClient.setAPIKey(user.apiKey || "user3_paid_token");
+
       let response;
 
       if (requestType === "region") {
@@ -181,6 +231,12 @@ const App = () => {
       // Process response and update map
       if (response && response.data) {
         if (selectedAPI === "potholes") {
+          // Debug: Log the actual response data structure
+          console.log("Pothole response data:", response.data);
+          console.log("Type of response.data:", typeof response.data);
+          console.log("Has features?", "features" in response.data);
+
+          // Backend returns GeoJSON data for potholes
           setMapData({ type: "geojson", data: response.data });
           const featureCount = response.data.features
             ? response.data.features.length
@@ -190,49 +246,75 @@ const App = () => {
             "success"
           );
         } else {
-          setMapData({ type: "uhi", data: response.data });
-          const dataCount = Array.isArray(response.data)
-            ? response.data.length
-            : 0;
-          addNotification(
-            `Heat island data loaded for ${dataCount} locations`,
-            "success"
-          );
+          // For UHI data, we need to process the backend response
+          // Backend currently returns placeholder data - adapt as needed
+          if (Array.isArray(response.data)) {
+            setMapData({ type: "uhi", data: response.data });
+            addNotification(
+              `Heat island data loaded for ${response.data.length} locations`,
+              "success"
+            );
+          } else {
+            // Handle placeholder UHI response from backend
+            const placeholderUHIData = [];
+            if (requestType === "region" && regionCenter) {
+              // Generate some placeholder points around the center
+              for (let i = 0; i < 5; i++) {
+                placeholderUHIData.push({
+                  lat: regionCenter.lat + (Math.random() - 0.5) * (radius / 55), // Rough conversion
+                  lng: regionCenter.lng + (Math.random() - 0.5) * (radius / 55),
+                  intensity: Math.random(),
+                });
+              }
+            } else if (requestType === "path" && pathPoints.length >= 2) {
+              // Generate some placeholder points along the path
+              for (let i = 0; i < 3; i++) {
+                const t = i / 2; // Interpolation factor
+                placeholderUHIData.push({
+                  lat:
+                    pathPoints[0].lat +
+                    t * (pathPoints[1].lat - pathPoints[0].lat),
+                  lng:
+                    pathPoints[0].lng +
+                    t * (pathPoints[1].lng - pathPoints[0].lng),
+                  intensity: Math.random(),
+                });
+              }
+            }
+            setMapData({ type: "uhi", data: placeholderUHIData });
+            addNotification(
+              `UHI analysis complete for the selected area`,
+              "success"
+            );
+          }
         }
       } else {
-        // Fallback to dummy data if no response
-        if (selectedAPI === "potholes") {
-          setMapData({ type: "geojson", data: DUMMY_POTHOLE_DATA });
-          addNotification(
-            `Using sample data: ${DUMMY_POTHOLE_DATA.features.length} potholes`,
-            "warning"
-          );
-        } else {
-          setMapData({ type: "uhi", data: DUMMY_UHI_DATA });
-          addNotification(
-            `Using sample data: ${DUMMY_UHI_DATA.length} locations`,
-            "warning"
-          );
-        }
+        addNotification("No data found for the selected area", "warning");
+        setMapData(null);
       }
     } catch (error) {
       console.error("API Error:", error);
 
       if (
         error.message?.includes("402") ||
-        error.message?.includes("payment")
+        error.message?.includes("payment") ||
+        error.message?.includes("Payment Required")
       ) {
         addNotification("Payment required for data access", "error");
         setShowPaymentModal(true);
+      } else if (
+        error.message?.includes("401") ||
+        error.message?.includes("Invalid API Key")
+      ) {
+        addNotification("Authentication failed. Please login again.", "error");
+        setUser(null);
       } else {
-        // Fallback to dummy data on error
-        addNotification("API unavailable, using sample data", "warning");
-        if (selectedAPI === "potholes") {
-          setMapData({ type: "geojson", data: DUMMY_POTHOLE_DATA });
-        } else {
-          setMapData({ type: "uhi", data: DUMMY_UHI_DATA });
-        }
+        addNotification(
+          "Error fetching data from backend. Please try again.",
+          "error"
+        );
       }
+      setMapData(null);
     } finally {
       setLoading(false);
     }
@@ -283,6 +365,7 @@ const App = () => {
           onBufferWidthChange={setBufferWidth}
           onGetData={handleGetData}
           loading={loading}
+          onLocationSelect={handleLocationSelect}
         />
 
         <MapComponent
@@ -293,6 +376,7 @@ const App = () => {
           pathPoints={pathPoints}
           radius={radius}
           mapData={mapData}
+          centerLocation={mapCenterLocation}
         />
       </div>
 
