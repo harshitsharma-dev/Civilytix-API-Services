@@ -3,17 +3,49 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-const PaymentModal = ({ isOpen, onClose, onPayment }) => {
+const PaymentModal = ({ isOpen, onClose, onPayment, user }) => {
   const [processing, setProcessing] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState("monthly");
 
   const handlePayment = async () => {
+    if (!user) {
+      return;
+    }
+
     setProcessing(true);
-    // Simulate payment processing delay
-    setTimeout(() => {
-      onPayment();
-      setProcessing(false);
+
+    try {
+      // Call the backend upgrade API
+      const response = await fetch(
+        "http://localhost:8000/api/v1/user/upgrade",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": user.api_key || "premium_user_key_001", // Use user's API key if available
+          },
+          body: JSON.stringify({
+            user_id: user.user_id,
+            plan_type: selectedPlan,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Upgrade failed");
+      }
+
+      const result = await response.json();
+
+      // Update user status in parent component
+      onPayment({ ...user, subscription_status: "premium" });
       onClose();
-    }, 2000);
+    } catch (error) {
+      console.error("Payment error:", error);
+      alert("Payment failed. Please try again.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -27,9 +59,51 @@ const PaymentModal = ({ isOpen, onClose, onPayment }) => {
         <CardContent>
           <div className="space-y-4">
             <p className="text-muted-foreground">
-              Unlock unlimited data requests and downloads
+              Unlock unlimited geospatial analysis and advanced features
             </p>
-            <div className="text-2xl font-bold text-green-600">$50.00 USD</div>
+
+            {/* Plan Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Plan:</label>
+              <div className="space-y-2">
+                <div
+                  className={`p-3 border rounded cursor-pointer ${
+                    selectedPlan === "monthly"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200"
+                  }`}
+                  onClick={() => setSelectedPlan("monthly")}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Monthly Plan</span>
+                    <span className="text-lg font-bold text-green-600">
+                      $29/mo
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Perfect for trying premium features
+                  </p>
+                </div>
+                <div
+                  className={`p-3 border rounded cursor-pointer ${
+                    selectedPlan === "yearly"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200"
+                  }`}
+                  onClick={() => setSelectedPlan("yearly")}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Yearly Plan</span>
+                    <span className="text-lg font-bold text-green-600">
+                      $299/yr
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600">
+                    Save $49/year - Best value!
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="bg-muted p-3 rounded-md">
               <h3 className="font-semibold text-sm mb-2">Premium Features:</h3>

@@ -15,7 +15,7 @@ router = APIRouter(prefix="/data", tags=["data"])
 @router.post("/region", response_model=APIResponse)
 async def get_data_region(
     request_data: RegionRequest, 
-    user: Dict[str, Any] = Depends(auth_service.require_payment)
+    user: Dict[str, Any] = Depends(auth_service.require_premium)
 ) -> APIResponse:
     """
     Retrieves geospatial data for a specified region based on user payment status.
@@ -49,49 +49,12 @@ async def get_data_region(
             center_lat, center_lon, request_data.radius_km, request_data.dataType
         )
         
-        # Save data to cloud storage
-        if request_data.dataType == "potholes":
-            result_url = storage_service.upload_geojson(
-                retrieved_data, user["api_key"], request_id, 
-                request_data.dataType, "region"
-            )
-        elif request_data.dataType == "uhi":
-            # For UHI data, we would typically upload a TIFF file
-            # For now, we'll upload the placeholder JSON data
-            result_url = storage_service.upload_json_data(
-                retrieved_data, 
-                f"results/user_{user['api_key']}/{request_id}_uhi_region.json"
-            )
-        else:
-            raise HTTPException(
-                status_code=400, 
-                detail="Invalid dataType specified. Must be 'potholes' or 'uhi'."
-            )
-        
-        if not result_url:
-            raise HTTPException(
-                status_code=500, 
-                detail="Error saving data to cloud storage."
-            )
-        
-        # Log request in user history
-        log_entry = {
-            "requestId": request_id,
-            "timestamp": timestamp,
-            "endpoint": endpoint,
-            "requestParams": request_params,
-            "resultUrl": result_url
-        }
-        
-        success = db_service.add_request_to_history(user["_id"], log_entry)
-        if not success:
-            print(f"Warning: Failed to log request {request_id} to user history")
-        
+        # Return data directly instead of saving to cloud storage
         return APIResponse(
             status="success",
-            message="Your data is ready for download.",
+            message="Geospatial data retrieved successfully.",
             requestId=request_id,
-            downloadUrl=result_url
+            data=retrieved_data  # Return data directly
         )
         
     except HTTPException:
@@ -107,7 +70,7 @@ async def get_data_region(
 @router.post("/path", response_model=APIResponse)
 async def get_data_path(
     request_data: PathRequest,
-    user: Dict[str, Any] = Depends(auth_service.require_payment)
+    user: Dict[str, Any] = Depends(auth_service.require_premium)
 ) -> APIResponse:
     """
     Retrieves geospatial data for a specified path based on user payment status.
@@ -144,49 +107,12 @@ async def get_data_path(
             request_data.buffer_meters, request_data.dataType
         )
         
-        # Save data to cloud storage
-        if request_data.dataType == "potholes":
-            result_url = storage_service.upload_geojson(
-                retrieved_data, user["api_key"], request_id, 
-                request_data.dataType, "path"
-            )
-        elif request_data.dataType == "uhi":
-            # For UHI data, we would typically upload a TIFF file
-            # For now, we'll upload the placeholder JSON data
-            result_url = storage_service.upload_json_data(
-                retrieved_data, 
-                f"results/user_{user['api_key']}/{request_id}_uhi_path.json"
-            )
-        else:
-            raise HTTPException(
-                status_code=400, 
-                detail="Invalid dataType specified. Must be 'potholes' or 'uhi'."
-            )
-        
-        if not result_url:
-            raise HTTPException(
-                status_code=500, 
-                detail="Error saving data to cloud storage."
-            )
-        
-        # Log request in user history
-        log_entry = {
-            "requestId": request_id,
-            "timestamp": timestamp,
-            "endpoint": endpoint,
-            "requestParams": request_params,
-            "resultUrl": result_url
-        }
-        
-        success = db_service.add_request_to_history(user["_id"], log_entry)
-        if not success:
-            print(f"Warning: Failed to log request {request_id} to user history")
-        
+        # Return data directly instead of saving to cloud storage
         return APIResponse(
             status="success",
-            message="Your data is ready for download.",
+            message="Geospatial data retrieved successfully.",
             requestId=request_id,
-            downloadUrl=result_url
+            data=retrieved_data  # Return data directly
         )
         
     except HTTPException:

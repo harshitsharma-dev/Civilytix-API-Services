@@ -3,6 +3,57 @@ from typing import Dict, List, Optional
 from datetime import datetime
 
 
+class SimpleLogin(BaseModel):
+    """Simple login request model."""
+    email: str
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "email": "user@example.com"
+            }
+        }
+    }
+
+
+class UserProfile(BaseModel):
+    """User profile response model."""
+    user_id: str
+    email: str
+    full_name: str
+    subscription_status: str  # "free", "premium"
+    created_at: str
+    api_key: Optional[str] = None
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "user_id": "user_123456",
+                "email": "user@example.com", 
+                "full_name": "John Doe",
+                "subscription_status": "premium",
+                "created_at": "2024-01-01T00:00:00Z",
+                "api_key": "premium_user_key_001"
+            }
+        }
+    }
+
+
+class PaymentRequest(BaseModel):
+    """Payment processing request model."""
+    user_id: str
+    plan_type: str  # "monthly", "yearly"
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "user_id": "user_123456",
+                "plan_type": "monthly"
+            }
+        }
+    }
+
+
 class RegionRequest(BaseModel):
     """Request model for region-based data retrieval."""
     center: Dict[str, float]  # {"lat": float, "lon": float}
@@ -49,19 +100,23 @@ class RequestHistoryEntry(BaseModel):
 
 
 class User(BaseModel):
-    """User model for database operations."""
+    """Simple user model for GCS storage."""
+    user_id: str
     email: str
-    paymentStatus: str  # "paid" or "unpaid"
+    full_name: str
+    subscription_status: str  # "free", "premium"
+    created_at: str
     api_key: Optional[str] = None
-    requestHistory: List[RequestHistoryEntry] = []
     
     model_config = {
         "json_schema_extra": {
             "example": {
+                "user_id": "user_123456",
                 "email": "user@example.com",
-                "paymentStatus": "paid",
-                "api_key": "user3_paid_token",
-                "requestHistory": []
+                "full_name": "John Doe",
+                "subscription_status": "premium",
+                "created_at": "2024-01-01T00:00:00Z",
+                "api_key": "user3_paid_token"
             }
         }
     }
@@ -73,6 +128,7 @@ class APIResponse(BaseModel):
     message: str
     requestId: Optional[str] = None
     downloadUrl: Optional[str] = None
+    data: Optional[Dict] = None  # Direct data payload
 
 
 class ErrorResponse(BaseModel):

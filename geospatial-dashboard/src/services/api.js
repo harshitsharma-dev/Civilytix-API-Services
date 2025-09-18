@@ -1,12 +1,13 @@
 // API configuration and client for connecting to backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const API_VERSION = '/api/v1';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_VERSION = "/api/v1";
 
 class APIClient {
   constructor() {
     this.baseURL = `${API_BASE_URL}${API_VERSION}`;
     this.defaultHeaders = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
   }
 
@@ -19,7 +20,7 @@ class APIClient {
   getHeaders() {
     const headers = { ...this.defaultHeaders };
     if (this.apiKey) {
-      headers['X-API-Key'] = this.apiKey;
+      headers["X-API-Key"] = this.apiKey;
     }
     return headers;
   }
@@ -34,10 +35,12 @@ class APIClient {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(
+          errorData.message || `HTTP ${response.status}: ${response.statusText}`
+        );
       }
 
       return await response.json();
@@ -52,15 +55,17 @@ class APIClient {
     const url = `${API_BASE_URL}/health`;
     const config = {
       headers: this.getHeaders(),
-      method: 'GET',
+      method: "GET",
     };
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(
+          errorData.message || `HTTP ${response.status}: ${response.statusText}`
+        );
       }
 
       return await response.json();
@@ -72,34 +77,34 @@ class APIClient {
 
   // Data endpoints
   async getRegionData(requestData) {
-    return this.request('/data/region', {
-      method: 'POST',
+    return this.request("/data/region", {
+      method: "POST",
       body: JSON.stringify(requestData),
     });
   }
 
   async getPathData(requestData) {
-    return this.request('/data/path', {
-      method: 'POST',
+    return this.request("/data/path", {
+      method: "POST",
       body: JSON.stringify(requestData),
     });
   }
 
   // User endpoints
   async getUserHistory() {
-    return this.request('/user/history', { method: 'GET' });
+    return this.request("/user/history", { method: "GET" });
   }
 
   async getRequestDetails(requestId) {
-    return this.request(`/user/history/${requestId}`, { method: 'GET' });
+    return this.request(`/user/history/${requestId}`, { method: "GET" });
   }
 
   async getUserProfile() {
-    return this.request('/user/profile', { method: 'GET' });
+    return this.request("/user/profile", { method: "GET" });
   }
 
   async getUserStats() {
-    return this.request('/user/stats', { method: 'GET' });
+    return this.request("/user/stats", { method: "GET" });
   }
 }
 
@@ -136,12 +141,21 @@ export const API = {
     const requestData = {
       center: {
         lat: center.lat,
-        lon: center.lng || center.lon  // Handle both lng and lon formats
+        lon: center.lng || center.lon, // Handle both lng and lon formats
       },
       radius_km: radiusKm,
       dataType,
     };
-    return apiClient.getRegionData(requestData);
+
+    try {
+      const response = await apiClient.getRegionData(requestData);
+
+      // Backend now returns data directly in the response
+      return response;
+    } catch (error) {
+      console.error("Error fetching region data:", error);
+      throw error;
+    }
   },
 
   // Get data for path/route
@@ -149,16 +163,25 @@ export const API = {
     const requestData = {
       start_coords: {
         lat: startCoords.lat,
-        lon: startCoords.lng || startCoords.lon  // Handle both lng and lon formats
+        lon: startCoords.lng || startCoords.lon, // Handle both lng and lon formats
       },
       end_coords: {
         lat: endCoords.lat,
-        lon: endCoords.lng || endCoords.lon  // Handle both lng and lon formats
+        lon: endCoords.lng || endCoords.lon, // Handle both lng and lon formats
       },
       buffer_meters: bufferMeters,
       dataType,
     };
-    return apiClient.getPathData(requestData);
+
+    try {
+      const response = await apiClient.getPathData(requestData);
+
+      // Backend now returns data directly in the response
+      return response;
+    } catch (error) {
+      console.error("Error fetching path data:", error);
+      throw error;
+    }
   },
 
   // User-related operations

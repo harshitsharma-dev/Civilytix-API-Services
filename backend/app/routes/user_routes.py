@@ -2,11 +2,147 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any
 from datetime import datetime
 
-from app.models.schemas import HistoryResponse, DownloadResponse
-from app.services.auth import auth_service
+from app.models.schemas import HistoryResponse, DownloadResponse, SimpleLogin, UserProfile, PaymentRequest, APIResponse
+from app.services.auth import auth_service, AuthService
 from app.services.database import db_service
 
 router = APIRouter(prefix="/user", tags=["user"])
+
+
+@router.post("/login", response_model=UserProfile)
+async def login_user(login_data: SimpleLogin) -> UserProfile:
+    """
+    Simple login endpoint that returns user profile if found.
+    
+    Args:
+        login_data: Login request with email
+        
+    Returns:
+        UserProfile: User's profile information
+    """
+    try:
+        user = auth_service.get_user_by_email(login_data.email)
+        
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found. Please check your email address."
+            )
+        
+        # Return user profile with API key
+        return UserProfile(
+            user_id=user["user_id"],
+            email=user["email"],
+            full_name=user["full_name"],
+            subscription_status=user["subscription_status"],
+            created_at=user["created_at"],
+            api_key=user.get("api_key")
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error during login: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error during login."
+        )
+
+
+@router.post("/upgrade", response_model=APIResponse)
+async def upgrade_to_premium(
+    payment_data: PaymentRequest,
+    user: Dict[str, Any] = Depends(auth_service.get_current_user)
+) -> APIResponse:
+    """
+    Upgrade user to premium subscription.
+    
+    Args:
+        payment_data: Payment request with plan details
+        user: Current authenticated user
+        
+    Returns:
+        APIResponse: Success response with upgrade confirmation
+    """
+    try:
+        # Verify user is upgrading themselves or is authorized
+        if user["user_id"] != payment_data.user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only upgrade your own account."
+            )
+        
+        # Check if user is already premium
+        if user["subscription_status"] == "premium":
+            return APIResponse(
+                status="success",
+                message="User is already premium subscriber.",
+                data={
+                    "user_id": user["user_id"],
+                    "subscription_status": "premium",
+                    "plan_type": payment_data.plan_type
+                }
+            )
+        
+        # Process upgrade
+        auth_svc = AuthService()
+        success = auth_svc.upgrade_user_to_premium(user["user_id"])
+        
+        if success:
+            return APIResponse(
+                status="success",
+                message=f"Successfully upgraded to premium ({payment_data.plan_type} plan)!",
+                data={
+                    "user_id": user["user_id"],
+                    "subscription_status": "premium",
+                    "plan_type": payment_data.plan_type,
+                    "upgraded_at": datetime.utcnow().isoformat() + "Z"
+                }
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to process premium upgrade. Please try again."
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error during upgrade: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error during upgrade."
+        )
+
+
+@router.get("/profile", response_model=UserProfile)
+async def get_user_profile(
+    user: Dict[str, Any] = Depends(auth_service.get_current_user)
+) -> UserProfile:
+    """
+    Get current user's profile information.
+    
+    Args:
+        user: Current authenticated user
+        
+    Returns:
+        UserProfile: User's profile information
+    """
+    try:
+        return UserProfile(
+            user_id=user["user_id"],
+            email=user["email"],
+            full_name=user["full_name"],
+            subscription_status=user["subscription_status"],
+            created_at=user["created_at"]
+        )
+        
+    except Exception as e:
+        print(f"Error retrieving user profile: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error while retrieving profile."
+        )
 
 
 @router.get("/history", response_model=HistoryResponse)
@@ -90,36 +226,8 @@ async def get_specific_previous_output(
         )
 
 
-@router.get("/profile")
-async def get_user_profile(
-    user: Dict[str, Any] = Depends(auth_service.get_current_user)
-) -> Dict[str, Any]:
-    """
-    Get basic user profile information.
-    
-    Args:
-        user: Authenticated user
-        
-    Returns:
-        Dict: User profile data
-    """
-    try:
-        # Return basic user info without sensitive data
-        profile = {
-            "email": user.get("email"),
-            "paymentStatus": user.get("paymentStatus"),
-            "requestCount": len(user.get("requestHistory", [])),
-            "memberSince": user.get("created_at"),
-        }
-        
-        return profile
-        
-    except Exception as e:
-        print(f"Error retrieving user profile: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail="Internal server error occurred while retrieving user profile."
-        )
+
+@router.post("/process-payment", response_model=APIResponse)
 
 
 @router.get("/stats")

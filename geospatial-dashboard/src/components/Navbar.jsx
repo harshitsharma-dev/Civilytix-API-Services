@@ -11,21 +11,28 @@ const Navbar = ({ user, onLogin, onLogout, onUpgrade }) => {
       <div className="flex items-center gap-4">
         {user ? (
           <>
-            <span className="text-foreground">Welcome, {user.name}</span>
+            <span className="text-foreground">
+              Welcome, {user.full_name || user.name}
+            </span>
             <span
               className={`px-2 py-1 rounded text-xs ${
+                user.subscription_status === "premium" ||
                 user.paymentStatus === "paid"
                   ? "bg-green-100 text-green-800 border border-green-200"
                   : "bg-orange-100 text-orange-800 border border-orange-200"
               }`}
             >
-              {user.paymentStatus === "paid" ? "Premium" : "Free"}
+              {user.subscription_status === "premium" ||
+              user.paymentStatus === "paid"
+                ? "Premium"
+                : "Free"}
             </span>
-            {user.paymentStatus !== "paid" && (
-              <Button onClick={onUpgrade} variant="default">
-                Upgrade
-              </Button>
-            )}
+            {user.subscription_status !== "premium" &&
+              user.paymentStatus !== "paid" && (
+                <Button onClick={onUpgrade} variant="default">
+                  Upgrade
+                </Button>
+              )}
             <Button onClick={onLogout} variant="destructive">
               Logout
             </Button>
