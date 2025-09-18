@@ -27,3 +27,16 @@ build/
 .DS_Store
 Thumbs.db
 
+# virtualenv and caches
+backend/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# local creds / env
+backend/gcs-credentials.json
+backend/.env
+
+# misc
+.DS_Store
+node_modules/
