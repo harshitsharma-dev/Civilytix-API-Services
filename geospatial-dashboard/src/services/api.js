@@ -1,4 +1,6 @@
 // API configuration and client for connecting to backend
+import CostTracker from './costTracker.js';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const API_VERSION = '/api/v1';
 
@@ -106,13 +108,16 @@ class APIClient {
 // Create and export API client instance
 const apiClient = new APIClient();
 
+// Create cost tracker instance
+const costTracker = new CostTracker(apiClient);
+
 // Set default API key if available
 const defaultAPIKey = import.meta.env.VITE_DEFAULT_API_KEY;
 if (defaultAPIKey) {
   apiClient.setAPIKey(defaultAPIKey);
 }
 
-export { apiClient };
+export { apiClient, costTracker };
 
 // Utility functions for common API operations
 export const API = {

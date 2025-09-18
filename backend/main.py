@@ -9,6 +9,8 @@ from app.services.geospatial import geo_service
 from app.services.storage import storage_service
 from app.routes.data_routes import router as data_router
 from app.routes.user_routes import router as user_router
+from app.routes.usage_routes import router as usage_router
+from app.middleware.usage_middleware import UsageTrackingMiddleware, UsageReportingMiddleware
 
 
 @asynccontextmanager
@@ -68,9 +70,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add usage tracking middleware
+app.add_middleware(UsageTrackingMiddleware)
+app.add_middleware(UsageReportingMiddleware)
+
 # Include routers
 app.include_router(data_router, prefix=settings.API_V1_STR)
 app.include_router(user_router, prefix=settings.API_V1_STR)
+app.include_router(usage_router)
 
 
 @app.get("/")
